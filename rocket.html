@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轻羽之刃 - 5U, 6U, 7U羽毛球拍交互式选拍指南</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Calm Tech - A minimalist palette using warm neutrals (slate/zinc), an off-white background, and a muted cyan accent for a clean, modern, and harmonious feel. -->
+    <!-- Application Structure Plan: A user-centric, task-oriented SPA design. Instead of a linear report, the core is an interactive "Racket Explorer" with filters (weight, style, brand) and a detailed card view. This allows users to immediately find relevant rackets. Supporting sections, "Knowledge Base" and "Expert's Choice," provide context and guidance, mirroring a user's journey from learning to selection. This non-linear structure prioritizes quick comparison and personalized discovery over passive reading. -->
+    <!-- Visualization & Content Choices: Report Info: Racket specs (weight, balance, stiffness, max lbs) -> Goal: Compare -> Viz: Interactive card grid, dynamic Chart.js bar chart for direct comparison. || Report Info: All rackets' weight/balance data -> Goal: Relationships -> Viz: Interactive Chart.js scatter plot to show design trends (e.g., light-weight + head-heavy). || Report Info: Concepts (balance point, stiffness) -> Goal: Inform -> Viz: Diagrams built with HTML/CSS divs and transforms for a lightweight, interactive explanation. || JUSTIFICATION: This approach transforms static tables and text into a dynamic, explorable system. Chart.js (Canvas) is used for all data visualization, and HTML/CSS for diagrams, strictly adhering to the NO SVG/Mermaid constraint. Interactions like filtering, selecting, and viewing details empower the user. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 40vh;
+            max-height: 450px;
+        }
+        .nav-button, .lang-button {
+            transition: all 0.3s ease;
+        }
+        .nav-button.active, .lang-button.active {
+            background-color: #0891b2;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .filter-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .filter-button.active {
+            background-color: #0e7490;
+            color: white;
+            border-color: #0e7490;
+        }
+        .racket-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .racket-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        .diagram-racket {
+            width: 80px;
+            height: 250px;
+            border: 2px solid #9ca3af;
+            border-radius: 30px 30px 5px 5px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            margin: 0 auto;
+        }
+        .diagram-racket-head {
+            flex-grow: 1;
+            border-bottom: 2px solid #9ca3af;
+        }
+        .diagram-racket-shaft {
+            height: 120px;
+        }
+        .diagram-racket-grip {
+            height: 80px;
+            background-color: #e5e7eb;
+            border-radius: 0 0 3px 3px;
+        }
+        .balance-point-marker {
+            position: absolute;
+            left: -20px;
+            width: 15px;
+            height: 3px;
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-700">
+
+    <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="flex justify-between items-start mb-12">
+            <header class="text-left">
+                <h1 id="main-title" class="text-4xl md:text-5xl font-bold text-slate-800 mb-2">轻羽之刃</h1>
+                <p id="main-subtitle" class="text-lg text-cyan-700">5U, 6U, 7U羽毛球拍交互式选拍指南</p>
+            </header>
+            <div id="language-switcher" class="flex items-center bg-white p-1 rounded-lg shadow-sm">
+                <button data-lang="zh" class="lang-button active text-sm font-semibold py-1 px-3 rounded-md">中文</button>
+                <button data-lang="en" class="lang-button text-sm font-semibold py-1 px-3 rounded-md">EN</button>
+                <button data-lang="ko" class="lang-button text-sm font-semibold py-1 px-3 rounded-md">한국어</button>
+            </div>
+        </div>
+
+
+        <nav class="flex justify-center mb-10 bg-white p-2 rounded-xl shadow-sm sticky top-4 z-40">
+            <button data-view="explorer" id="nav-explorer" class="nav-button active font-semibold py-2 px-3 sm:px-6 rounded-lg">🔎 探索球拍</button>
+            <button data-view="knowledge" id="nav-knowledge" class="nav-button font-semibold py-2 px-3 sm:px-6 rounded-lg">📚 核心知识</button>
+            <button data-view="recommendations" id="nav-recommendations" class="nav-button font-semibold py-2 px-3 sm:px-6 rounded-lg">🏆 专家推荐</button>
+        </nav>
+
+        <main id="main-content">
+            <!-- Content will be rendered here by JavaScript -->
+        </main>
+
+    </div>
+
+    <!-- Modal for Racket Details -->
+    <div id="racket-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div id="modal-content" class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto transform scale-95">
+            <!-- Modal content will be injected here -->
+        </div>
+    </div>
+
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const translations = {
+            // English Translations
+            en: {
+                pageTitle: "Feather Blade - 5U, 6U, 7U Badminton Racket Interactive Guide",
+                mainTitle: "Feather Blade",
+                mainSubtitle: "Interactive Guide to 5U, 6U, 7U Badminton Rackets",
+                nav: {
+                    explorer: "🔎 Explore Rackets",
+                    knowledge: "📚 Core Knowledge",
+                    recommendations: "🏆 Expert's Choice"
+                },
+                explorer: {
+                    intro: "Here you can filter rackets by weight, play style, and brand. Click on a racket card for detailed information, or check multiple rackets to compare their specifications.",
+                    filterWeight: "Weight:",
+                    filterStyle: "Style:",
+                    filterBrand: "Brand:",
+                    all: "All",
+                    offensive: "Offensive",
+                    defensive: "Defensive",
+                    allRound: "All-Round",
+                    allBrands: "All Brands",
+                    noResults: "No rackets found matching the criteria.",
+                    compare: "Compare",
+                    viewDetails: "View Details",
+                    comparisonTitle: "Specification Comparison",
+                    comparisonIntro: "Please select 2 or more rackets from the cards above to compare.",
+                    chartLabelLbs: "Max Recommended Tension (lbs)",
+                    chartLabelBalance: "Balance Type",
+                    yAxisLbs: "Tension (lbs)",
+                    yAxisBalance: "Balance Type"
+                },
+                modal: {
+                    specs: "Core Specs",
+                    weight: "Weight",
+                    balance: "Balance",
+                    stiffness: "Stiffness",
+                    maxLbs: "Max Tension",
+                    style: "Play Style",
+                    tech: "Key Technologies",
+                    idealPlayer: "Ideal Player",
+                    analysis: "Performance Analysis",
+                    unspecified: "Unspecified",
+                    close: "Close"
+                },
+                knowledge: {
+                    titleU: "Decoding 'U': More Than Just a Number",
+                    introU: "In the world of badminton, 'U' is the internationally accepted system for racket weight classification. The larger the U value, the lighter the unstrung racket. This seemingly minor difference can significantly impact swing speed and arm endurance during long matches.",
+                    grams: "grams",
+                    titleTrinity: "Beyond Weight: The Trinity that Defines Feel",
+                    introTrinity: "Choosing a racket based on weight alone is far from sufficient. The balance point and shaft stiffness together define the soul of the racket. Modern ultralight rackets, through sophisticated 'compensatory designs' (like head-heavy balances) and high-tension capabilities, have overturned the traditional notion that 'light equals weak'.",
+                    balanceTitle: "Balance Point: The Sensation of Weight Distribution",
+                    balanceHeadHeavy: "Head-Heavy (Offensive)",
+                    balanceEven: "Even Balance (All-Round)",
+                    balanceHeadLight: "Head-Light (Defensive)",
+                    stiffnessTitle: "Shaft Stiffness: The Engine of Power Transfer",
+                    stiffnessFlex: "Flexible Shaft",
+                    stiffnessFlexDesc: "Creates a 'whip-like' effect, helping to generate power by borrowing force, friendly to players with less strength.",
+                    stiffnessStiff: "Stiff Shaft",
+                    stiffnessStiffDesc: "Offers direct power transfer and precise shot placement, but requires significant explosive power from the player."
+                },
+                recommendations: {
+                    title: "Expert's Choice",
+                    intro: "Based on all analyses, we have selected a few rackets that stand out in their respective fields. Click on the cards for detailed reviews.",
+                    decisionTitle: "Your Racket Selection Framework (3-Step Method)",
+                    step1Title: "Step 1: Assess Skill & Strength",
+                    step1Desc: "Honestly evaluate your physical condition and technical level to determine if you need the racket to assist in power generation or to provide precise control.",
+                    step2Title: "Step 2: Define Your Dominant Play Style",
+                    step2Desc: "Are you a backcourt attacker (head-heavy), a net-front defensive master (head-light), or an all-round player who switches seamlessly between offense and defense (even balance)?",
+                    step3Title: "Step 3: Match Your Profile to a Racket",
+                    step3Desc: "Use the 'Explore Rackets' feature to match your profile with racket characteristics to find your perfect partner.",
+                    clickDetails: "Click for details"
+                },
+                racketData: [
+                    { id: 1, model: 'Victor Jetspeed S 08', brand: 'Victor', weightClass: '5U', weightGrams: '~77g', balance: 'Even', stiffness: 'Medium', maxLbs: 26, style: 'All-Round', technologies: ['AERO-SWORD', 'CSR'], description: 'A classic, high-value model from Victor\'s Jetspeed series, focusing on a light, fast, and comfortable hitting experience. Designed for players seeking speed and agility.', analysis: 'The even balance and medium stiff shaft give the JS-08 excellent versatility. It responds quickly in defense and flat drives, while the shaft\'s repulsion provides enough power for offense. "Easy to handle" is its most prominent feature.', idealPlayer: 'Intermediate players seeking a racket that excels in speed without sacrificing stability and comfort. A no-brainer for fast-paced doubles enthusiasts.', highlight: 'King of All-Rounders' },
+                    { id: 2, model: 'Victor DriveX 3F', brand: 'Victor', weightClass: '5U', weightGrams: '5U', balance: 'Even', stiffness: 'Flexible', maxLbs: 26, style: 'All-Round', technologies: ['AERO-HEX', 'NANO TEC'], description: 'A clearly positioned racket designed for female players and beginners/intermediates, aiming to provide ultimate ease of use and comfort. Features an elegant black and pink design with floral motifs.', analysis: 'The combination of a 5U lightweight frame and a flexible shaft is key to its user-friendliness. The flexible shaft easily "borrows" force, helping players with less power to hit high-quality backcourt shots, while the light body ensures quick defensive reactions.', idealPlayer: 'Beginner to intermediate female players, or anyone who prioritizes comfort and ease of use over sheer offensive power.', highlight: '' },
+                    { id: 3, model: 'Yonex Nanoflare 700 Pro', brand: 'Yonex', weightClass: '5U', weightGrams: '75-79.9g', balance: 'Head-Light', stiffness: 'Medium', maxLbs: 27, style: 'Defensive', technologies: ['Sonic Flare System', 'ISOMETRIC'], description: 'As one of the flagship models of the NF series, the NF-700 Pro is synonymous with "speed" and "rapid fire," made in Japan, representing Yonex\'s top craftsmanship.', analysis: 'This is a weapon born for speed. The head-light balance and aerodynamically optimized frame allow it to cut through the air effortlessly, making it perfect for fast drives and defensive counter-attacks.', idealPlayer: 'Advanced doubles or singles players who pursue top-tier equipment and a swift playstyle, needing a lightweight racket that provides lightning-fast reactions and precise control.', highlight: 'Pro-Level Speed Choice' },
+                    { id: 4, model: 'Li-Ning Tectonic 7I', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: 'Head-Heavy', balancePoint: 312, stiffness: 'Flexible', maxLbs: 32, style: 'Offensive', technologies: ['High-End Carbon Fiber'], description: 'From Li-Ning\'s "Tectonic" series focused on offense, this 5U spec racket is designed for lightweight attack and is the weapon of choice for pros like Goh Liu Ying.', analysis: 'The Tectonic 7I is a prime example of "compensatory design." It has a 5U light body for swing speed but creates powerful smashes through an extremely head-heavy balance and the "whip effect" of its flexible shaft.', idealPlayer: 'Aggressive players who want the speed of a 5U racket but refuse to compromise on smash power. Especially suitable for backcourt female doubles players needing offensive firepower.', highlight: '' },
+                    { id: 5, model: 'Li-Ning Axforce 90', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: 'Even', stiffness: 'Medium', maxLbs: 29, style: 'Offensive', technologies: ['M50 Carbon', 'Slim Elastic Shaft'], description: 'As the flagship of Li-Ning\'s "Axforce" series, the Axforce 90 also comes in a 5U version, allowing more players to experience the series\' signature powerful offense without the burden of a traditional heavy racket.', analysis: 'Compared to the Tectonic 7I, the 5U version of the Axforce 90 offers a more balanced feel. Its "light" swing weight and "medium" feel make it faster to swing and easier to handle.', idealPlayer: 'High-intermediate to advanced players who want a top-tier offensive racket but find the traditional 3U/4U versions too heavy.', highlight: '' },
+                    { id: 6, model: 'Li-Ning Windstorm 72', brand: 'Li-Ning', weightClass: '6U', weightGrams: '72g', balance: 'Head-Heavy', balancePoint: 315, stiffness: 'Flexible', maxLbs: 30, style: 'Offensive', technologies: ['Super Light Tech', 'UHB Shaft'], description: 'A legendary racket in the ultralight category. Its 72g weight is between 6U and 7U, and it\'s renowned for its unique "hammer effect".', analysis: 'The Windstorm 72 is the perfect embodiment of "compensatory design." Its extremely high 315mm head-heavy balance point on a mere 72g frame creates a unique hitting experience.', idealPlayer: 'Doubles players, especially front-court players who need lightning-fast reaction speed but also want a match-winning shot in the mid-court.', highlight: 'Featherweight Cannon' },
+                    { id: 7, model: 'Li-Ning Bladex 73 Light', brand: 'Li-Ning', weightClass: '6U', weightGrams: '~73-76g', balance: 'Head-Light', stiffness: 'Flexible', maxLbs: 31, style: 'Defensive', technologies: ['TB Nano', 'Sonic Boom System'], description: 'As a lightweight newcomer to the Bladex series, it offers a completely different feel from the Windstorm. It focuses more on "lightning fast" and "defensive counter-attack" style.', analysis: 'Contrary to the Windstorm, the Bladex 73 Light is a head-light design. This makes it swifter to swing and more maneuverable, a pure speed and defense machine.', idealPlayer: 'Defensive specialists, front-court doubles players, or anyone pursuing ultimate swing speed and maneuverability.', highlight: 'Speed Demon' },
+                    { id: 8, model: 'Victor Thruster K HMRL', brand: 'Victor', weightClass: '6U', weightGrams: '~74g', balance: 'Head-Heavy', stiffness: 'Medium-Flexible', maxLbs: 27, style: 'Offensive', technologies: ['Power BOX'], description: 'From Victor\'s power-focused Thruster series, the TK-HMRL is an offensive lightweight racket. It is positioned to allow more players to easily experience the joy of lightweight offense.', analysis: 'The 6U weight makes it agile and quick to start, while the head-heavy balance and stable box-frame provide the necessary power for attacks.', idealPlayer: 'Developing offensive players, or intermediate enthusiasts who want a racket that is both light and can deliver a heavy hit.', highlight: '' },
+                    { id: 9, model: 'Victor Thruster K 7U', brand: 'Victor', weightClass: '7U', weightGrams: '65-69.9g', balance: 'Head-Heavy', stiffness: 'Medium-Flexible', maxLbs: 30, style: 'Offensive', technologies: ['FRS', 'Power BOX', 'NANO TEC'], description: 'The TK-7U is a milestone product, proving that a 7U frame can be not only sturdy and durable but also powerfully offensive.', analysis: 'Its static weight is astonishingly light, providing unparalleled maneuverability. However, its head-heavy balance and stable frame capable of high tension allow it to launch powerful attacks when swung.', idealPlayer: 'Advanced players with refined technique who can handle a head-heavy balance and want the ultimate speed advantage.', highlight: 'Ultimate Lightweight Weapon' },
+                    { id: 10, model: 'Bonny Feather FT68', brand: 'Bonny', weightClass: '7U', weightGrams: '68g', balance: 'Even', balancePoint: 295, stiffness: 'Medium', maxLbs: null, style: 'All-Round', technologies: ['Aero-grade Carbon Fiber', 'Low Drag Frame'], description: 'Bonny has long specialized in lightweight rackets, and the Feather series is its masterpiece. The FT68 is a 7U all-round racket.', analysis: 'Unlike Victor\'s TK-7U, Bonny\'s FT68 uses a more even balance design. This makes it slightly less powerful in pure offense but offers better maneuverability and a friendlier feel.', idealPlayer: 'Players seeking an extremely light racket but preferring an even feel, who focus more on shot placement and feel rather than pure power smashes.', highlight: '' }
+                ]
+            },
+            // Chinese Translations
+            zh: {
+                pageTitle: "轻羽之刃 - 5U, 6U, 7U羽毛球拍交互式选拍指南",
+                mainTitle: "轻羽之刃",
+                mainSubtitle: "5U, 6U, 7U羽毛球拍交互式选拍指南",
+                nav: {
+                    explorer: "🔎 探索球拍",
+                    knowledge: "📚 核心知识",
+                    recommendations: "🏆 专家推荐"
+                },
+                explorer: {
+                    intro: "在这里，您可以根据重量、打法风格和品牌来筛选球拍。点击球拍卡片查看详细信息，或勾选多个球拍进行规格对比。",
+                    filterWeight: "重量:",
+                    filterStyle: "风格:",
+                    filterBrand: "品牌:",
+                    all: "全部",
+                    offensive: "进攻型",
+                    defensive: "防守型",
+                    allRound: "全能型",
+                    allBrands: "全部品牌",
+                    noResults: "没有找到符合条件的球拍。",
+                    compare: "对比",
+                    viewDetails: "查看详情",
+                    comparisonTitle: "规格对比",
+                    comparisonIntro: "请在上方球拍卡片中选择2个或更多球拍进行对比。",
+                    chartLabelLbs: "最高建议磅数 (lbs)",
+                    chartLabelBalance: "平衡类型",
+                    yAxisLbs: "磅数 (lbs)",
+                    yAxisBalance: "平衡类型"
+                },
+                modal: {
+                    specs: "核心规格",
+                    weight: "重量",
+                    balance: "平衡点",
+                    stiffness: "中管硬度",
+                    maxLbs: "最高建议磅数",
+                    style: "打法风格",
+                    tech: "关键技术",
+                    idealPlayer: "理想用户",
+                    analysis: "性能剖析",
+                    unspecified: "未明确",
+                    close: "关闭"
+                },
+                knowledge: {
+                    titleU: "解码“U”：不止于数字",
+                    introU: "在羽毛球的世界里，“U”是国际通用的球拍重量分级体系。U值越大，球拍的空拍重量越轻。这个看似微小的差异，在长时间的比赛中，会对挥拍速度和手臂耐力产生显著影响。",
+                    grams: "克",
+                    titleTrinity: "超越重量：决定手感的三位一体",
+                    introTrinity: "仅仅看重量选拍是远远不够的。平衡点和中管硬度共同决定了球拍的灵魂。现代超轻量球拍通过精密的“补偿性设计”（如头重设计）和高磅数能力，颠覆了“轻=弱”的传统观念。",
+                    balanceTitle: "平衡点: 重量分布的感觉",
+                    balanceHeadHeavy: "头重型 (进攻)",
+                    balanceEven: "均衡型 (全能)",
+                    balanceHeadLight: "头轻型 (防守)",
+                    stiffnessTitle: "中管硬度: 力量传导的引擎",
+                    stiffnessFlex: "柔性中管",
+                    stiffnessFlexDesc: "产生类似“鞭子”的甩动效应，有助于借力打力，对力量较小的球员友好。",
+                    stiffnessStiff: "刚性中管",
+                    stiffnessStiffDesc: "力量传导直接，落点精准，但对球员的爆发力要求很高。"
+                },
+                recommendations: {
+                    title: "专家之选",
+                    intro: "综合所有分析，我们为您精选出在各自领域表现最为出色的几款球拍。点击卡片可查看详细测评。",
+                    decisionTitle: "您的选拍决策框架 (三步法)",
+                    step1Title: "第一步: 评估技术与力量",
+                    step1Desc: "诚实评估您的身体条件和技术水平，确定您需要球拍辅助发力，还是需要它来精准控制。",
+                    step2Title: "第二步: 明确主导打法",
+                    step2Desc: "您是后场进攻者 (头重型)，网前防守大师 (头轻型)，还是攻防兼备的全能选手 (均衡型)？",
+                    step3Title: "第三步: 匹配球拍",
+                    step3Desc: "利用“探索球拍”功能，将您的画像与球拍特性进行匹配，找到您的最佳搭档。",
+                    clickDetails: "点击查看详情"
+                },
+                racketData: [
+                    { id: 1, model: 'Victor Jetspeed S 08', brand: 'Victor', weightClass: '5U', weightGrams: '~77g', balance: '均衡', stiffness: '中等', maxLbs: 26, style: '全能型', technologies: ['AERO-SWORD (破风菱形框)', 'CSR (核甲胶囊)'], description: '胜利极速系列中一款以高性价比著称的经典型号，主打轻快、舒适的击球体验。专为追求速度和敏捷性的球员设计，是一款出色的全能型球拍。', analysis: '均衡的平衡点和中等硬度的中管赋予了JS-08极佳的通用性。它在防守和快速平抽中反应迅速，而在进攻时，中管的回弹也能提供足够的力量支持。“易于操控”是它最显著的标签。', idealPlayer: '寻求一支在速度上表现出色，同时又不失稳定性和舒适度的中阶球员。对于热衷于快节奏双打的爱好者来说，JS-08是一个不会出错的选择。', highlight: '全能之王' },
+                    { id: 2, model: 'Victor DriveX 3F', brand: 'Victor', weightClass: '5U', weightGrams: '5U', balance: '均衡', stiffness: '柔性', maxLbs: 26, style: '全能型', technologies: ['AERO-HEX (导风六角框)', 'NANO TEC (纳米技术)'], description: '这是一款定位清晰的球拍，专为女性球员和初中级爱好者设计，旨在提供极致的易用性和舒适度。其优雅的黑粉涂装点缀着花卉图案，颜值出众。', analysis: '5U的轻量化框架与柔性中管的组合，是其易用性的关键。柔性中管能轻松“借力”，帮助力量不足的球员打出高质量的后场球，而轻巧的拍身则保证了防守时的快速反应。', idealPlayer: '初阶至中阶的女性球员，或任何将舒适度和易上手性置于纯粹暴力进攻之上的球员。', highlight: '' },
+                    { id: 3, model: 'Yonex Nanoflare 700 Pro', brand: 'Yonex', weightClass: '5U', weightGrams: '75-79.9g', balance: '头轻', stiffness: '中等', maxLbs: 27, style: '防守型', technologies: ['Sonic Flare System', 'ISOMETRIC (方形拍头)'], description: '作为NF系列的旗舰型号之一，NF-700 Pro是“速度”与“闪击”的代名词，在日本本土制造，代表了尤尼克斯的顶尖工艺。', analysis: '这是一把为速度而生的利器。头轻的平衡点和空气动力学优化的拍框使其在空气中穿梭自如，非常适合快速的平抽快挡和防守反击。', idealPlayer: '追求顶级装备、打法迅猛的进阶双打选手或单打选手，他们需要一把能提供闪电般反应和精准控制的轻量化球拍。', highlight: '专业级速度之选' },
+                    { id: 4, model: 'Li-Ning Tectonic 7I', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: '头重', balancePoint: 312, stiffness: '柔性', maxLbs: 32, style: '进攻型', technologies: ['高端碳纤维'], description: '源自李宁主打进攻的“突袭”系列，这款5U规格的球拍专为轻量化进攻而设计，是吴柳莹等职业选手的战拍。', analysis: 'Tectonic 7I是“补偿性设计”理念的绝佳范例。它拥有5U的轻巧拍身以保证挥速，但通过极端的头重平衡点和柔性中管的“鞭击效应”来创造强大的杀球威力。', idealPlayer: '打法极具侵略性，既想要5U球拍的速度，又拒绝在杀球力量上妥协的球员。尤其适合需要进攻火力的后场女双选手。', highlight: '' },
+                    { id: 5, model: 'Li-Ning Axforce 90', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: '均衡', stiffness: '适中', maxLbs: 29, style: '进攻型', technologies: ['M50碳素', '纤细弹性中杆'], description: '作为李宁“雷霆”系列的旗舰型号，Axforce 90同样推出了5U规格，让更多球员能体验到该系列标志性的强大进攻火力，而无需承受传统重型球拍的负担。', analysis: '与Tectonic 7I相比，5U版本的Axforce 90提供了更为均衡的手感。其“轻”挥重和“适中”的击球感使其挥动更迅速、更易于上手。', idealPlayer: '希望拥有一支顶级进攻拍，但觉得传统3U/4U版本过于沉重的中高阶球员。', highlight: '' },
+                    { id: 6, model: 'Li-Ning Windstorm 72', brand: 'Li-Ning', weightClass: '6U', weightGrams: '72g', balance: '头重', balancePoint: 315, stiffness: '柔性', maxLbs: 30, style: '进攻型', technologies: ['Super Light Tech', 'UHB Shaft'], description: '这是一款在超轻量领域堪称传奇的球拍。其72克的重量介于6U和7U之间，以其独特的“锤击效应”而闻名遐迩。', analysis: 'Windstorm 72是“补偿性设计”理念最完美的体现。其高达315毫米的头重平衡点，加载在一个仅72克的拍体上，创造了独一无二的击球体验。', idealPlayer: '双打选手，尤其是需要闪电般反应速度但又希望在中前场具备一拍制胜能力的前场球员。', highlight: '羽量级炮台' },
+                    { id: 7, model: 'Li-Ning Bladex 73 Light', brand: 'Li-Ning', weightClass: '6U', weightGrams: '~73-76g', balance: '头轻', stiffness: '柔性', maxLbs: 31, style: '防守型', technologies: ['TB Nano', 'Sonic Boom System'], description: '作为锋影（BladeX）系列的轻量化新锐，它提供了与Windstorm截然不同的手感。它更专注于“闪电般快速”和“防守反击”的风格。', analysis: '与Windstorm截然相反，Bladex 73 Light是头轻型设计。这使其在挥动时更加迅捷、操控性更强，是一台纯粹的速度与防守机器。', idealPlayer: '防守专家、前场双打选手，或任何追求极致挥拍速度和操控性的球员。', highlight: '速度恶魔' },
+                    { id: 8, model: 'Victor Thruster K HMRL', brand: 'Victor', weightClass: '6U', weightGrams: '~74g', balance: '头重', stiffness: '中等柔韧', maxLbs: 27, style: '进攻型', technologies: ['Power BOX (箱形结构)'], description: '源自胜利以力量著称的突击（Thruster）系列，TK-HMRL是一款进攻型轻量球拍。它的定位是让更多球员能够轻松体验到轻量化进攻的乐趣。', analysis: '6U的重量使其挥动敏捷、启动迅速，而头重的平衡点和稳定的箱形拍框则为进攻提供了所需的力量。', idealPlayer: '正在成长中的进攻型球员，或希望拥有一支既轻巧又能打出重击的中阶爱好者。', highlight: '' },
+                    { id: 9, model: 'Victor Thruster K 7U', brand: 'Victor', weightClass: '7U', weightGrams: '65-69.9g', balance: '头重', stiffness: '中等柔韧', maxLbs: 30, style: '进攻型', technologies: ['FRS (强叠层系统)', 'Power BOX', 'NANO TEC'], description: 'TK-7U是一款里程碑式的产品，它有力地证明了7U级别的拍框不仅可以做到坚固耐用，更能具备强大的进攻性。', analysis: '它在手中的静态重量轻得惊人，赋予了无与伦比的操控性。然而，头重的平衡点和能够承受高磅的稳定拍框，使其在挥出时能够发动强力有效的攻击。', idealPlayer: '技术细腻、能够驾驭头重平衡点并希望获得终极速度优势的进阶球员。', highlight: '终极轻量武器' },
+                    { id: 10, model: 'Bonny Feather FT68', brand: 'Bonny', weightClass: '7U', weightGrams: '68g', balance: '均衡', balancePoint: 295, stiffness: '中等', maxLbs: null, style: '全能型', technologies: ['航空级碳纤维', '低风阻框型'], description: '波力品牌在轻量化球拍领域深耕多年，而轻羽（Feather）系列是其得意之作。FT68是一款7U级别的攻防兼备型球拍。', analysis: '与胜利的TK-7U不同，波力的FT68采用了更为均衡的平衡点设计。这使得它在纯粹的暴力进攻上稍逊一筹，但换来了更好的操控性和更友好的上手度。', idealPlayer: '寻求一支极致轻量但偏好均衡手感的球员，他们更注重落点控制和手感，而非一味的重杀。', highlight: '' }
+                ]
+            },
+            // Korean Translations
+            ko: {
+                pageTitle: "페더 블레이드 - 5U, 6U, 7U 배드민턴 라켓 인터랙티브 가이드",
+                mainTitle: "페더 블레이드",
+                mainSubtitle: "5U, 6U, 7U 배드민턴 라켓 인터랙티브 가이드",
+                nav: {
+                    explorer: "🔎 라켓 둘러보기",
+                    knowledge: "📚 핵심 정보",
+                    recommendations: "🏆 전문가 추천"
+                },
+                explorer: {
+                    intro: "여기서 무게, 플레이 스타일, 브랜드별로 라켓을 필터링할 수 있습니다. 라켓 카드를 클릭하여 상세 정보를 확인하거나 여러 라켓을 선택하여 스펙을 비교해보세요.",
+                    filterWeight: "무게:",
+                    filterStyle: "스타일:",
+                    filterBrand: "브랜드:",
+                    all: "전체",
+                    offensive: "공격형",
+                    defensive: "수비형",
+                    allRound: "올라운드형",
+                    allBrands: "모든 브랜드",
+                    noResults: "조건에 맞는 라켓을 찾을 수 없습니다.",
+                    compare: "비교하기",
+                    viewDetails: "상세보기",
+                    comparisonTitle: "스펙 비교",
+                    comparisonIntro: "위 라켓 카드에서 2개 이상의 라켓을 선택하여 비교해주세요.",
+                    chartLabelLbs: "최대 권장 텐션 (lbs)",
+                    chartLabelBalance: "밸런스 타입",
+                    yAxisLbs: "텐션 (lbs)",
+                    yAxisBalance: "밸런스 타입"
+                },
+                modal: {
+                    specs: "핵심 스펙",
+                    weight: "무게",
+                    balance: "밸런스 포인트",
+                    stiffness: "샤프트 경도",
+                    maxLbs: "최대 권장 텐션",
+                    style: "플레이 스타일",
+                    tech: "핵심 기술",
+                    idealPlayer: "추천 플레이어",
+                    analysis: "성능 분석",
+                    unspecified: "미지정",
+                    close: "닫기"
+                },
+                knowledge: {
+                    titleU: "'U' 해독하기: 숫자 그 이상",
+                    introU: "배드민턴 세계에서 'U'는 국제적으로 통용되는 라켓 무게 등급 체계입니다. U 값이 클수록 스트링을 매지 않은 라켓의 무게가 가벼워집니다. 이 사소해 보이는 차이가 장시간의 경기 동안 스윙 속도와 팔의 지구력에 상당한 영향을 미칠 수 있습니다.",
+                    grams: "그램",
+                    titleTrinity: "무게를 넘어: 타구감을 결정하는 삼위일체",
+                    introTrinity: "무게만 보고 라켓을 선택하는 것은 절대 충분하지 않습니다. 밸런스 포인트와 샤프트 경도가 함께 라켓의 영혼을 결정합니다. 현대의 초경량 라켓은 정교한 '보상 설계'(예: 헤드헤비 밸런스)와 고텐션 수용 능력을 통해 '가벼움=약함'이라는 전통적인 관념을 뒤집었습니다.",
+                    balanceTitle: "밸런스 포인트: 무게 분포의 감각",
+                    balanceHeadHeavy: "헤드헤비 (공격형)",
+                    balanceEven: "이븐 밸런스 (올라운드형)",
+                    balanceHeadLight: "헤드라이트 (수비형)",
+                    stiffnessTitle: "샤프트 경도: 파워 전달의 엔진",
+                    stiffnessFlex: "유연한 샤프트",
+                    stiffnessFlexDesc: "'채찍'과 같은 효과를 만들어 힘을 빌려 치는 데 도움을 주며, 힘이 약한 플레이어에게 유리합니다.",
+                    stiffnessStiff: "견고한 샤프트",
+                    stiffnessStiffDesc: "직접적인 파워 전달과 정교한 샷 배치를 제공하지만, 플레이어의 상당한 폭발력을 요구합니다."
+                },
+                recommendations: {
+                    title: "전문가 추천",
+                    intro: "모든 분석을 종합하여 각 분야에서 가장 뛰어난 성능을 보이는 몇 가지 라켓을 선정했습니다. 카드를 클릭하여 상세 리뷰를 확인하세요.",
+                    decisionTitle: "라켓 선택 결정 프레임워크 (3단계)",
+                    step1Title: "1단계: 기술 및 힘 평가",
+                    step1Desc: "자신의 신체 조건과 기술 수준을 솔직하게 평가하여 라켓이 파워 생성을 도와야 하는지, 아니면 정밀한 컨트롤을 제공해야 하는지 결정하세요.",
+                    step2Title: "2단계: 주된 플레이 스타일 정의",
+                    step2Desc: "백코트 공격수(헤드헤비), 네트 앞 수비의 달인(헤드라이트), 또는 공격과 수비를 자유자재로 전환하는 올라운드 플레이어(이븐 밸런스) 중 어디에 속하십니까?",
+                    step3Title: "3단계: 프로필과 라켓 매칭",
+                    step3Desc: "'라켓 둘러보기' 기능을 사용하여 자신의 프로필과 라켓 특성을 매칭하여 완벽한 파트너를 찾으세요.",
+                    clickDetails: "상세보기 클릭"
+                },
+                racketData: [
+                    { id: 1, model: '빅터 제트스피드 S 08', brand: 'Victor', weightClass: '5U', weightGrams: '~77g', balance: '이븐', stiffness: '중간', maxLbs: 26, style: '올라운드형', technologies: ['AERO-SWORD', 'CSR'], description: '빅터 제트스피드 시리즈의 클래식한 고가성비 모델로, 가볍고 빠른 편안한 타구감을 특징으로 합니다. 속도와 민첩성을 추구하는 플레이어를 위해 설계되었습니다.', analysis: '이븐 밸런스와 중간 경도의 샤프트는 JS-08에 뛰어난 범용성을 부여합니다. 수비와 빠른 드라이브에서 신속하게 반응하며, 샤프트의 반발력은 공격 시 충분한 파워를 제공합니다. "다루기 쉽다"는 것이 가장 큰 특징입니다.', idealPlayer: '안정성과 편안함을 희생하지 않으면서 속도에서 뛰어난 성능을 원하는 중급 플레이어. 빠른 템포의 복식 애호가에게 탁월한 선택입니다.', highlight: '올라운더의 왕' },
+                    { id: 2, model: '빅터 드라이브X 3F', brand: 'Victor', weightClass: '5U', weightGrams: '5U', balance: '이븐', stiffness: '유연', maxLbs: 26, style: '올라운드형', technologies: ['AERO-HEX', 'NANO TEC'], description: '여성 플레이어와 초중급자를 위해 명확하게 포지셔닝된 라켓으로, 최고의 사용 편의성과 편안함을 제공하는 것을 목표로 합니다. 우아한 블랙 앤 핑크 디자인에 꽃무늬가 특징입니다.', analysis: '5U 경량 프레임과 유연한 샤프트의 조합이 사용자 친화성의 핵심입니다. 유연한 샤프트는 힘이 부족한 플레이어가 양질의 백코트 샷을 칠 수 있도록 "힘을 빌려주며", 가벼운 바디는 빠른 수비 반응을 보장합니다.', idealPlayer: '초급에서 중급 여성 플레이어, 또는 순수한 공격력보다 편안함과 사용 편의성을 우선시하는 모든 플레이어.', highlight: '' },
+                    { id: 3, model: '요넥스 나노플레어 700 프로', brand: 'Yonex', weightClass: '5U', weightGrams: '75-79.9g', balance: '헤드라이트', stiffness: '중간', maxLbs: 27, style: '수비형', technologies: ['Sonic Flare System', 'ISOMETRIC'], description: 'NF 시리즈의 플래그십 모델 중 하나인 NF-700 Pro는 "속도"와 "속사"의 대명사이며, 일본에서 제작되어 요넥스의 최고 장인정신을 대표합니다.', analysis: '이것은 속도를 위해 태어난 무기입니다. 헤드라이트 밸런스와 공기역학적으로 최적화된 프레임은 공기를 쉽게 가르며, 빠른 드라이브와 수비적인 카운터 공격에 완벽합니다.', idealPlayer: '최고 수준의 장비와 신속한 플레이 스타일을 추구하는 상급 복식 또는 단식 선수로, 번개처럼 빠른 반응과 정밀한 컨트롤을 제공하는 경량 라켓이 필요한 선수.', highlight: '프로급 스피드 선택' },
+                    { id: 4, model: '리닝 텍토닉 7I', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: '헤드헤비', balancePoint: 312, stiffness: '유연', maxLbs: 32, style: '공격형', technologies: ['고급 카본 파이버'], description: '리닝의 공격 중심 "텍토닉" 시리즈에서 파생된 이 5U 사양 라켓은 경량 공격을 위해 설계되었으며, 고 리우 잉과 같은 프로 선수들이 선택하는 무기입니다.', analysis: '텍토닉 7I는 "보상 설계"의 대표적인 예입니다. 스윙 속도를 위한 5U의 가벼운 바디를 가졌지만, 극단적인 헤드헤비 밸런스와 유연한 샤프트의 "채찍 효과"를 통해 강력한 스매시를 만들어냅니다.', idealPlayer: '5U 라켓의 속도를 원하면서도 스매시 파워를 타협하고 싶지 않은 공격적인 플레이어. 특히 공격 화력이 필요한 후위 여성 복식 선수에게 적합합니다.', highlight: '' },
+                    { id: 5, model: '리닝 액스포스 90', brand: 'Li-Ning', weightClass: '5U', weightGrams: '5U', balance: '이븐', stiffness: '중간', maxLbs: 29, style: '공격형', technologies: ['M50 카본', '슬림 탄성 샤프트'], description: '리닝 "액스포스" 시리즈의 플래그십인 액스포스 90은 5U 버전으로도 출시되어 더 많은 플레이어가 전통적인 무거운 라켓의 부담 없이 시리즈의 시그니처인 강력한 공격을 경험할 수 있게 합니다.', analysis: '텍토닉 7I에 비해 5U 버전의 액스포스 90은 더 균형 잡힌 느낌을 제공합니다. "가벼운" 스윙웨이트와 "중간" 느낌은 스윙을 더 빠르고 다루기 쉽게 만듭니다.', idealPlayer: '최고 수준의 공격용 라켓을 원하지만 전통적인 3U/4U 버전이 너무 무겁다고 느끼는 중상급 플레이어.', highlight: '' },
+                    { id: 6, model: '리닝 윈드스톰 72', brand: 'Li-Ning', weightClass: '6U', weightGrams: '72g', balance: '헤드헤비', balancePoint: 315, stiffness: '유연', maxLbs: 30, style: '공격형', technologies: ['슈퍼 라이트 테크', 'UHB 샤프트'], description: '초경량 카테고리에서 전설적인 라켓입니다. 72g의 무게는 6U와 7U 사이이며, 독특한 "해머 효과"로 유명합니다.', analysis: '윈드스톰 72는 "보상 설계"의 완벽한 구현입니다. 단 72g 프레임에 적용된 극도로 높은 315mm의 헤드헤비 밸런스 포인트는 독특한 타구 경험을 만들어냅니다.', idealPlayer: '복식 선수, 특히 번개처럼 빠른 반응 속도와 함께 중코트에서 결정적인 샷을 원하는 전위 플레이어.', highlight: '페더급 대포' },
+                    { id: 7, model: '리닝 블레이덱스 73 라이트', brand: 'Li-Ning', weightClass: '6U', weightGrams: '~73-76g', balance: '헤드라이트', stiffness: '유연', maxLbs: 31, style: '수비형', technologies: ['TB 나노', '소닉 붐 시스템'], description: '블레이덱스 시리즈의 경량 신제품으로, 윈드스톰과는 전혀 다른 느낌을 제공합니다. "번개처럼 빠른" 그리고 "수비적 카운터 공격" 스타일에 더 중점을 둡니다.', analysis: '윈드스톰과 정반대로, 블레이덱스 73 라이트는 헤드라이트 디자인입니다. 이로 인해 스윙이 더 빠르고 조작성이 뛰어나 순수한 속도와 수비 기계입니다.', idealPlayer: '수비 전문가, 전위 복식 선수, 또는 궁극의 스윙 속도와 조작성을 추구하는 모든 플레이어.', highlight: '스피드 데몬' },
+                    { id: 8, model: '빅터 스러스터 K HMRL', brand: 'Victor', weightClass: '6U', weightGrams: '~74g', balance: '헤드헤비', stiffness: '중간-유연', maxLbs: 27, style: '공격형', technologies: ['파워 박스'], description: '빅터의 파워 중심 스러스터 시리즈에서 나온 TK-HMRL은 공격적인 경량 라켓입니다. 더 많은 플레이어가 경량 공격의 즐거움을 쉽게 경험할 수 있도록 포지셔닝되었습니다.', analysis: '6U 무게는 민첩하고 빠르게 시작하게 해주며, 헤드헤비 밸런스와 안정적인 박스 프레임은 공격에 필요한 파워를 제공합니다.', idealPlayer: '성장 중인 공격형 플레이어, 또는 가벼우면서도 강력한 타격을 원하는 중급 애호가.', highlight: '' },
+                    { id: 9, model: '빅터 스러스터 K 7U', brand: 'Victor', weightClass: '7U', weightGrams: '65-69.9g', balance: '헤드헤비', stiffness: '중간-유연', maxLbs: 30, style: '공격형', technologies: ['FRS', '파워 박스', '나노 텍'], description: 'TK-7U는 7U 프레임이 튼튼하고 내구성이 있을 뿐만 아니라 강력하게 공격적일 수 있음을 증명하는 이정표적인 제품입니다.', analysis: '정적 무게는 놀라울 정도로 가벼워 비할 데 없는 조작성을 제공합니다. 그러나 헤드헤비 밸런스와 고텐션을 견딜 수 있는 안정적인 프레임은 스윙 시 강력한 공격을 가능하게 합니다.', idealPlayer: '헤드헤비 밸런스를 다룰 수 있고 궁극의 속도 이점을 원하는 섬세한 기술을 가진 상급 플레이어.', highlight: '궁극의 경량 무기' },
+                    { id: 10, model: '보니 페더 FT68', brand: 'Bonny', weightClass: '7U', weightGrams: '68g', balance: '이븐', balancePoint: 295, stiffness: '중간', maxLbs: null, style: '올라운드형', technologies: ['항공 등급 카본 파이버', '저저항 프레임'], description: '보니는 오랫동안 경량 라켓을 전문으로 해왔으며 페더 시리즈는 그 걸작입니다. FT68은 7U 올라운드 라켓입니다.', analysis: '빅터의 TK-7U와 달리, 보니의 FT68은 더 균형 잡힌 밸런스 디자인을 사용합니다. 이로 인해 순수 공격력은 약간 떨어지지만 더 나은 조작성과 친근한 느낌을 제공합니다.', idealPlayer: '극도로 가벼운 라켓을 찾지만 균형 잡힌 느낌을 선호하며, 순수한 파워 스매시보다는 샷 배치와 느낌에 더 중점을 두는 플레이어.', highlight: '' }
+                ]
+            }
+        };
+
+        const state = {
+            currentView: 'explorer',
+            currentLang: 'zh',
+            filters: {
+                weightClass: 'all',
+                style: 'all',
+                brand: 'all'
+            },
+            selectedForComparison: []
+        };
+
+        const mainContent = document.getElementById('main-content');
+        const navButtons = document.querySelectorAll('.nav-button');
+        const modal = document.getElementById('racket-modal');
+        const modalContent = document.getElementById('modal-content');
+        const langButtons = document.querySelectorAll('.lang-button');
+
+        const updateUIText = () => {
+            const t = translations[state.currentLang];
+            document.documentElement.lang = state.currentLang;
+            document.title = t.pageTitle;
+            document.getElementById('main-title').textContent = t.mainTitle;
+            document.getElementById('main-subtitle').textContent = t.mainSubtitle;
+            document.getElementById('nav-explorer').textContent = t.nav.explorer;
+            document.getElementById('nav-knowledge').textContent = t.nav.knowledge;
+            document.getElementById('nav-recommendations').textContent = t.nav.recommendations;
+        };
+
+        const render = () => {
+            updateUIText();
+            mainContent.innerHTML = '';
+            
+            navButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === state.currentView);
+            });
+
+            langButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
+            });
+
+            switch (state.currentView) {
+                case 'explorer':
+                    mainContent.innerHTML = getExplorerView();
+                    renderRackets();
+                    setupExplorerEventListeners();
+                    renderComparisonChart();
+                    break;
+                case 'knowledge':
+                    mainContent.innerHTML = getKnowledgeView();
+                    break;
+                case 'recommendations':
+                    mainContent.innerHTML = getRecommendationsView();
+                    setupRecommendationsEventListeners();
+                    break;
+            }
+        };
+        
+        const getExplorerView = () => {
+            const t = translations[state.currentLang].explorer;
+            return `
+            <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                 <p class="text-slate-600 mb-6 text-center">${t.intro}</p>
+                <div class="flex flex-wrap gap-4 justify-center mb-6">
+                    <div class="flex items-center gap-2 flex-wrap justify-center">
+                        <span class="font-semibold text-slate-600">${t.filterWeight}</span>
+                        <button data-filter="weightClass" data-value="all" class="filter-button active border border-slate-300 px-3 py-1 rounded-full">${t.all}</button>
+                        <button data-filter="weightClass" data-value="5U" class="filter-button border border-slate-300 px-3 py-1 rounded-full">5U</button>
+                        <button data-filter="weightClass" data-value="6U" class="filter-button border border-slate-300 px-3 py-1 rounded-full">6U</button>
+                        <button data-filter="weightClass" data-value="7U" class="filter-button border border-slate-300 px-3 py-1 rounded-full">7U</button>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap justify-center">
+                        <span class="font-semibold text-slate-600">${t.filterStyle}</span>
+                        <button data-filter="style" data-value="all" class="filter-button active border border-slate-300 px-3 py-1 rounded-full">${t.all}</button>
+                        <button data-filter="style" data-value="${translations.en.explorer.offensive}" class="filter-button border border-slate-300 px-3 py-1 rounded-full">${t.offensive}</button>
+                        <button data-filter="style" data-value="${translations.en.explorer.defensive}" class="filter-button border border-slate-300 px-3 py-1 rounded-full">${t.defensive}</button>
+                        <button data-filter="style" data-value="${translations.en.explorer.allRound}" class="filter-button border border-slate-300 px-3 py-1 rounded-full">${t.allRound}</button>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap justify-center">
+                        <span class="font-semibold text-slate-600">${t.filterBrand}</span>
+                        <select id="brand-filter" class="filter-select bg-white border border-slate-300 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                            <option value="all">${t.allBrands}</option>
+                            <option value="Victor">Victor</option>
+                            <option value="Li-Ning">Li-Ning</option>
+                            <option value="Yonex">Yonex</option>
+                            <option value="Bonny">Bonny</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="racket-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
+
+            <div id="comparison-section" class="bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-bold text-slate-800 text-center mb-4">${t.comparisonTitle}</h2>
+                <p class="text-slate-600 mb-6 text-center">${t.comparisonIntro}</p>
+                <div class="chart-container mx-auto max-w-4xl">
+                    <canvas id="comparison-chart"></canvas>
+                </div>
+            </div>
+        `;
+        };
+        
+        const renderRackets = () => {
+            const grid = document.getElementById('racket-grid');
+            if (!grid) return;
+            const t = translations[state.currentLang].explorer;
+            const m = translations[state.currentLang].modal;
+            const racketData = translations[state.currentLang].racketData;
+
+            const filteredRackets = racketData.filter(racket => {
+                const styleEn = translations.en.racketData.find(enR => enR.id === racket.id).style;
+                return (state.filters.weightClass === 'all' || racket.weightClass === state.filters.weightClass) &&
+                       (state.filters.style === 'all' || styleEn === state.filters.style) &&
+                       (state.filters.brand === 'all' || racket.brand === state.filters.brand);
+            });
+            
+            if (filteredRackets.length === 0) {
+                 grid.innerHTML = `<p class="text-center col-span-full text-slate-500 py-10">${t.noResults}</p>`;
+                 return;
+            }
+
+            grid.innerHTML = filteredRackets.map(racket => `
+                <div class="racket-card bg-white rounded-xl shadow-md overflow-hidden flex flex-col p-5">
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-start">
+                             <h3 class="text-xl font-bold text-slate-800 mb-1">${racket.model}</h3>
+                             <span class="text-sm font-semibold text-white ${
+                                 racket.brand === 'Victor' ? 'bg-blue-500' :
+                                 racket.brand === 'Li-Ning' ? 'bg-red-500' :
+                                 racket.brand === 'Yonex' ? 'bg-indigo-500' : 'bg-green-500'
+                             } px-2 py-0.5 rounded-full">${racket.brand}</span>
+                        </div>
+                        <p class="text-slate-500 text-sm mb-4">${racket.description.substring(0, 80)}...</p>
+                        
+                        <div class="grid grid-cols-3 gap-2 text-center text-sm mb-4">
+                            <div class="bg-slate-100 p-2 rounded-lg">
+                                <div class="font-bold text-slate-700">${racket.weightClass}</div>
+                                <div class="text-slate-500">${m.weight}</div>
+                            </div>
+                            <div class="bg-slate-100 p-2 rounded-lg">
+                                <div class="font-bold text-slate-700">${racket.balance}</div>
+                                <div class="text-slate-500">${m.balance}</div>
+                            </div>
+                            <div class="bg-slate-100 p-2 rounded-lg">
+                                <div class="font-bold text-slate-700">${racket.stiffness}</div>
+                                <div class="text-slate-500">${m.stiffness}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto flex justify-between items-center">
+                         <button data-id="${racket.id}" class="view-details-btn bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">${t.viewDetails}</button>
+                         <label class="flex items-center space-x-2 text-slate-600 cursor-pointer">
+                            <input type="checkbox" data-id="${racket.id}" class="compare-checkbox h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500">
+                            <span>${t.compare}</span>
+                        </label>
+                    </div>
+                </div>
+            `).join('');
+
+            setupCardEventListeners();
+        };
+        
+        const setupExplorerEventListeners = () => {
+            document.querySelectorAll('.filter-button').forEach(button => {
+                button.addEventListener('click', e => {
+                    const filter = e.target.dataset.filter;
+                    const value = e.target.dataset.value;
+                    state.filters[filter] = value;
+                    document.querySelectorAll(`button[data-filter="${filter}"]`).forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    renderRackets();
+                });
+            });
+
+            document.getElementById('brand-filter').addEventListener('change', e => {
+                state.filters.brand = e.target.value;
+                renderRackets();
+            });
+        };
+
+        const setupCardEventListeners = () => {
+             document.querySelectorAll('.view-details-btn').forEach(button => {
+                button.addEventListener('click', e => {
+                    const racketId = parseInt(e.target.dataset.id, 10);
+                    showModal(racketId);
+                });
+            });
+
+            document.querySelectorAll('.compare-checkbox').forEach(checkbox => {
+                 checkbox.checked = state.selectedForComparison.includes(String(checkbox.dataset.id));
+                 checkbox.addEventListener('change', e => {
+                    const racketId = e.target.dataset.id;
+                    if (e.target.checked) {
+                        if (!state.selectedForComparison.includes(racketId)) {
+                            state.selectedForComparison.push(racketId);
+                        }
+                    } else {
+                        state.selectedForComparison = state.selectedForComparison.filter(id => id !== racketId);
+                    }
+                    renderComparisonChart();
+                });
+            });
+        };
+
+        const getBalanceScore = (racket) => {
+            const enRacket = translations.en.racketData.find(r => r.id === racket.id);
+            if (!enRacket) return 0;
+            switch (enRacket.balance) {
+                case 'Head-Light': return 1;
+                case 'Even': return 2;
+                case 'Head-Heavy': return 3;
+                default: return 0;
+            }
+        };
+
+        let comparisonChartInstance;
+        const renderComparisonChart = () => {
+            const ctx = document.getElementById('comparison-chart');
+            if (!ctx) return;
+            const t = translations[state.currentLang].explorer;
+            const currentRacketData = translations[state.currentLang].racketData;
+            const originalRacketData = translations.zh.racketData;
+
+            const balanceTypes = {
+                1: translations[state.currentLang].knowledge.balanceHeadLight.split(' ')[0],
+                2: translations[state.currentLang].knowledge.balanceEven.split(' ')[0],
+                3: translations[state.currentLang].knowledge.balanceHeadHeavy.split(' ')[0],
+            };
+
+            const comparisonData = state.selectedForComparison.map(id => {
+                 const originalData = originalRacketData.find(r => r.id == id);
+                 const translatedData = currentRacketData.find(r => r.id == id);
+                 return { ...originalData, ...translatedData };
+            });
+            
+            const comparisonSection = document.getElementById('comparison-section');
+            if (comparisonData.length < 2) {
+                comparisonSection.querySelector('p').style.display = 'block';
+            } else {
+                comparisonSection.querySelector('p').style.display = 'none';
+            }
+
+            if (comparisonChartInstance) {
+                comparisonChartInstance.destroy();
+            }
+            
+            comparisonChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: comparisonData.map(r => r.model),
+                    datasets: [
+                        {
+                            label: t.chartLabelLbs,
+                            data: comparisonData.map(r => r.maxLbs),
+                            backgroundColor: 'rgba(8, 145, 178, 0.6)',
+                            borderColor: 'rgba(8, 145, 178, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: t.chartLabelBalance,
+                            data: comparisonData.map(r => getBalanceScore(r)),
+                            backgroundColor: 'rgba(217, 70, 239, 0.6)',
+                            borderColor: 'rgba(217, 70, 239, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        tooltip: { 
+                            callbacks: { 
+                                label: function(context) { 
+                                    let label = context.dataset.label || ''; 
+                                    if (label) { label += ': '; }
+
+                                    if (context.dataset.yAxisID === 'y1') {
+                                        const score = context.parsed.y;
+                                        label += balanceTypes[score] || 'N/A';
+                                    } else {
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y;
+                                        }
+                                    }
+                                    return label; 
+                                } 
+                            } 
+                        } 
+                    },
+                    scales: {
+                        y: { 
+                            type: 'linear', 
+                            display: true, 
+                            position: 'left', 
+                            title: { display: true, text: t.yAxisLbs } 
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 0,
+                            max: 4,
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value, index, values) {
+                                    return balanceTypes[value] || '';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: t.yAxisBalance
+                            },
+                            grid: {
+                                drawOnChartArea: false, 
+                            },
+                        },
+                    }
+                }
+            });
+        };
+
+        const showModal = (racketId) => {
+            const t = translations[state.currentLang].modal;
+            const racket = translations[state.currentLang].racketData.find(r => r.id === racketId);
+            const originalRacket = translations.zh.racketData.find(r => r.id === racketId);
+            if (!racket) return;
+
+            modalContent.innerHTML = `
+                <div class="p-6 md:p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl md:text-3xl font-bold text-slate-800">${racket.model}</h2>
+                        <button id="close-modal-btn" class="text-3xl font-light text-slate-400 hover:text-slate-600">&times;</button>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div class="space-y-4">
+                             <div class="bg-slate-100 p-4 rounded-lg">
+                                <h4 class="font-semibold text-slate-700 mb-2">${t.specs}</h4>
+                                <ul class="list-disc list-inside text-slate-600 space-y-1">
+                                    <li><b>${t.weight}:</b> ${racket.weightClass} (${racket.weightGrams})</li>
+                                    <li><b>${t.balance}:</b> ${racket.balance} ${originalRacket.balancePoint ? `(${originalRacket.balancePoint}mm)` : ''}</li>
+                                    <li><b>${t.stiffness}:</b> ${racket.stiffness}</li>
+                                    <li><b>${t.maxLbs}:</b> ${originalRacket.maxLbs ? originalRacket.maxLbs + ' lbs' : t.unspecified}</li>
+                                    <li><b>${t.style}:</b> ${racket.style}</li>
+                                </ul>
+                            </div>
+                            <div class="bg-slate-100 p-4 rounded-lg">
+                                <h4 class="font-semibold text-slate-700 mb-2">${t.tech}</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    ${racket.technologies.map(tech => `<span class="bg-cyan-100 text-cyan-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">${tech}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg">
+                            <h4 class="font-semibold text-amber-800 mb-2">${t.idealPlayer}</h4>
+                            <p class="text-amber-700">${racket.idealPlayer}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-4 text-slate-700">
+                        <div>
+                            <h4 class="font-semibold text-lg mb-1">${t.analysis}</h4>
+                            <p>${racket.analysis}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+            
+            document.getElementById('close-modal-btn').addEventListener('click', hideModal);
+        };
+
+        const hideModal = () => {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        };
+
+        const getKnowledgeView = () => {
+            const t = translations[state.currentLang].knowledge;
+            return `
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg space-y-12">
+                <div>
+                     <h2 class="text-2xl font-bold text-slate-800 text-center mb-6">${t.titleU}</h2>
+                     <p class="text-slate-600 max-w-3xl mx-auto mb-6">${t.introU}</p>
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center max-w-2xl mx-auto">
+                         <div class="bg-slate-100 p-4 rounded-lg"><span class="font-bold text-lg">5U:</span> 75 - 79.9 ${t.grams}</div>
+                         <div class="bg-slate-100 p-4 rounded-lg"><span class="font-bold text-lg">6U:</span> 70 - 74.9 ${t.grams}</div>
+                         <div class="bg-slate-100 p-4 rounded-lg"><span class="font-bold text-lg">7U:</span> 65 - 69.9 ${t.grams}</div>
+                     </div>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 text-center mb-6">${t.titleTrinity}</h2>
+                    <p class="text-slate-600 max-w-3xl mx-auto mb-8">${t.introTrinity}</p>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="text-center">
+                            <h3 class="text-xl font-semibold mb-4">${t.balanceTitle}</h3>
+                            <div class="flex justify-around items-end">
+                                <div>
+                                    <div class="diagram-racket"><div class="diagram-racket-head"><div class="balance-point-marker" style="top: 30%;"></div></div><div class="diagram-racket-shaft"></div><div class="diagram-racket-grip"></div></div>
+                                    <p class="mt-2 font-medium">${t.balanceHeadHeavy}</p>
+                                </div>
+                                <div>
+                                    <div class="diagram-racket"><div class="diagram-racket-head"><div class="balance-point-marker" style="top: 50%;"></div></div><div class="diagram-racket-shaft"></div><div class="diagram-racket-grip"></div></div>
+                                    <p class="mt-2 font-medium">${t.balanceEven}</p>
+                                </div>
+                                <div>
+                                    <div class="diagram-racket"><div class="diagram-racket-head"><div class="balance-point-marker" style="top: 70%;"></div></div><div class="diagram-racket-shaft"></div><div class="diagram-racket-grip"></div></div>
+                                    <p class="mt-2 font-medium">${t.balanceHeadLight}</p>
+                                </div>
+                            </div>
+                        </div>
+                         <div class="text-center">
+                            <h3 class="text-xl font-semibold mb-4">${t.stiffnessTitle}</h3>
+                             <div class="grid grid-cols-1 gap-4 text-left">
+                                 <div class="bg-slate-100 p-4 rounded-lg">
+                                     <h4 class="font-bold">${t.stiffnessFlex}</h4>
+                                     <p class="text-sm text-slate-600">${t.stiffnessFlexDesc}</p>
+                                 </div>
+                                 <div class="bg-slate-100 p-4 rounded-lg">
+                                     <h4 class="font-bold">${t.stiffnessStiff}</h4>
+                                     <p class="text-sm text-slate-600">${t.stiffnessStiffDesc}</p>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        }
+
+        const getRecommendationsView = () => {
+            const t = translations[state.currentLang].recommendations;
+            const racketData = translations[state.currentLang].racketData;
+            const recommendedRackets = racketData.filter(r => r.highlight);
+            return `
+                 <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg space-y-12">
+                     <div>
+                        <h2 class="text-2xl font-bold text-slate-800 text-center mb-6">${t.title}</h2>
+                        <p class="text-slate-600 max-w-3xl mx-auto mb-8 text-center">${t.intro}</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${recommendedRackets.map(racket => `
+                                <div data-id="${racket.id}" class="racket-card view-details-btn cursor-pointer bg-gradient-to-br from-cyan-50 to-blue-100 p-6 rounded-xl border-2 border-cyan-200 flex flex-col items-center text-center">
+                                    <div class="mb-2 text-lg font-bold text-cyan-800">${racket.highlight}</div>
+                                    <div class="text-2xl font-bold text-slate-900 mb-2">${racket.model}</div>
+                                    <p class="text-sm text-slate-600 flex-grow">${racket.idealPlayer}</p>
+                                    <span class="mt-4 text-xs font-semibold bg-white text-cyan-700 px-3 py-1 rounded-full shadow-sm">${t.clickDetails}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                     </div>
+                     <div>
+                         <h2 class="text-2xl font-bold text-slate-800 text-center mb-6">${t.decisionTitle}</h2>
+                         <div class="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
+                            <div class="bg-slate-100 p-5 rounded-lg">
+                                <h3 class="font-bold text-lg mb-2"><span class="text-cyan-600">${t.step1Title.split(':')[0]}:</span> ${t.step1Title.split(':')[1]}</h3>
+                                <p class="text-sm text-slate-600">${t.step1Desc}</p>
+                            </div>
+                            <div class="bg-slate-100 p-5 rounded-lg">
+                                <h3 class="font-bold text-lg mb-2"><span class="text-cyan-600">${t.step2Title.split(':')[0]}:</span> ${t.step2Title.split(':')[1]}</h3>
+                                <p class="text-sm text-slate-600">${t.step2Desc}</p>
+                            </div>
+                             <div class="bg-slate-100 p-5 rounded-lg">
+                                <h3 class="font-bold text-lg mb-2"><span class="text-cyan-600">${t.step3Title.split(':')[0]}:</span> ${t.step3Title.split(':')[1]}</h3>
+                                <p class="text-sm text-slate-600">${t.step3Desc}</p>
+                            </div>
+                         </div>
+                     </div>
+                 </div>
+            `;
+        };
+        
+        const setupRecommendationsEventListeners = () => {
+             document.querySelectorAll('.view-details-btn').forEach(button => {
+                button.addEventListener('click', e => {
+                    const racketId = parseInt(e.currentTarget.dataset.id, 10);
+                    showModal(racketId);
+                });
+            });
+        };
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                state.currentView = e.target.dataset.view;
+                render();
+            });
+        });
+
+        langButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                state.currentLang = e.target.dataset.lang;
+                render();
+            });
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideModal();
+            }
+        });
+
+        // Initial render
+        render();
+    });
+    </script>
+
+</body>
+</html>
